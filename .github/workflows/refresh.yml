@@ -1,0 +1,82 @@
+# Keeps the NYC rental scout fresh.
+#
+#   full  — pull live Craigslist -> rate every listing with the Claude API
+#           (photos + text; needs the ANTHROPIC_API_KEY repo secret) -> build
+#           -> commit data.js. Runs daily at 7am ET. Without the secret it
+#           degrades to a sweep instead of failing.
+#   sweep — re-check the shown listings and prune dead ones (no LLM, no
+#           key, free). Runs every 6h between fulls.
+name: refresh
+on:
+  schedule:
+    - cron: "0 11 * * *"      # daily full refresh (7am ET)
+    - cron: "0 2,17,23 * * *" # keyless dead-listing sweeps
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = pull + LLM rate + build; sweep = prune dead only"
+        type: choice
+        options: [sweep, full]
+        default: sweep
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: determine mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.mode }}"
+          elif [ "${{ github.event.schedule }}" = "0 11 * * *" ]; then
+            MODE=full
+          else
+            MODE=sweep
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "running in mode: $MODE"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: full refresh (pull + rate + build)
+        if: steps.mode.outputs.mode == 'full'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY secret not set — degrading to sweep (no re-rating)."
+            python3 refresh/refresh.py --sweep
+          else
+            pip install --quiet anthropic pillow
+            python3 refresh/refresh.py --pull
+            python3 refresh/rate.py
+            python3 refresh/refresh.py --build
+          fi
+
+      - name: sweep (prune dead listings)
+        if: steps.mode.outputs.mode == 'sweep'
+        run: python3 refresh/refresh.py --sweep
+
+      - name: commit & push if changed
+        run: |
+          git config user.name "rental-scout bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.js
+          # gyms snapshot self-refreshes on full runs; may not exist until the first success
+          git add refresh/gyms.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no changes to publish"
+            exit 0
+          fi
+          git commit -m "auto-refresh (${{ steps.mode.outputs.mode }})"
+          git pull --rebase
+          git push

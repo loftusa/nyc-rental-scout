@@ -1,0 +1,5 @@
+refresh/shortlist.json
+refresh/ratings.json
+refresh/pull_stats.json
+__pycache__/
+.DS_Store

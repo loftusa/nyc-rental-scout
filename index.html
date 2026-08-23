@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>NYC rental scout</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  :root{
+    --paper:#faf9f5; --panel:#fffdf8; --ink:#23201b; --muted:#6f6a60; --faint:#928c80;
+    --rule:#e6e0d2; --rule2:#efeadd;
+    --apt:#2f7d75; --room:#b06a1a; --pick:#977a1c;
+    --nature:#4f8a55; --quiet:#5f7189; --nice:#7b6091; --social:#bd8a3a; --value:#3f867e; --commute:#8a8378; --aesthetic:#b0654d; --gym:#8d4a62;
+    --good:#3f7d4e; --warn:#b0573c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    -webkit-font-smoothing:antialiased;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+  .num{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  .ui{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  a{color:#2f6f68;text-decoration:none;border-bottom:1px solid #cfe0dd}
+  a:hover{border-bottom-color:#2f6f68}
+
+  header.masthead{border-bottom:2px solid var(--ink);margin-top:26px;padding-bottom:14px}
+  h1{font-size:33px;line-height:1.08;margin:0 0 6px;letter-spacing:-.01em;font-weight:600}
+  .sub{color:var(--muted);font-size:16.5px;max-width:760px;margin:0}
+  .statstrip{display:flex;flex-wrap:wrap;gap:0;margin:16px 0 2px;border-top:1px solid var(--rule)}
+  .stat{padding:9px 20px 7px 0;margin-right:20px;border-right:0}
+  .stat .k{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
+  .stat .v{font-size:19px}
+  .stat .v small{font-size:12.5px;color:var(--muted)}
+
+  h2{font-size:14px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink);
+    border-bottom:1px solid var(--ink);padding-bottom:5px;margin:44px 0 4px;font-weight:600}
+  .h2note{color:var(--muted);font-size:14px;margin:6px 0 16px}
+
+  /* controls */
+  .lbcut{border-top:1px dashed var(--rule);margin:5px 0 3px}
+  .lbrow.offboard{opacity:.45}
+  #wpanel{margin:16px 0 4px;padding:12px 14px;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
+  .wtop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .wtitle{font-weight:600;font-size:13px;letter-spacing:.02em}
+  #wreset{font:11px -apple-system,sans-serif;border:none;background:none;color:var(--muted);cursor:pointer;padding:0}
+  #wreset:hover{color:var(--ink)}
+  #wbar{display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:10px;background:var(--rule2)}
+  #wbar i{transition:width .25s ease}
+  #wsliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:2px 20px}
+  .wsl{display:grid;grid-template-columns:70px 1fr 34px;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+  .wsl input[type=range]{width:100%;height:3px;margin:0}
+  .wsl .wpct{text-align:right;font-variant-numeric:tabular-nums}
+  .wrow2{display:flex;gap:24px;align-items:center;margin-top:10px;font-size:11.5px;color:var(--muted)}
+  .wrow2 input[type=range]{width:130px;vertical-align:middle;accent-color:var(--ink)}
+  .wrow2 select{font:11.5px -apple-system,sans-serif;color:var(--ink)}
+  @media(max-width:860px){#wsliders{grid-template-columns:1fr 1fr}}
+  .controls{display:flex;flex-wrap:wrap;gap:16px 26px;align-items:center;margin:14px 0 18px;
+    font-size:13px}
+  .cgroup{display:flex;align-items:center;gap:7px}
+  .cgroup .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .chip{cursor:pointer;padding:3px 10px;border:1px solid var(--rule);border-radius:13px;background:var(--panel);
+    color:var(--muted);user-select:none;transition:.12s}
+  .chip:hover{border-color:var(--faint)}
+  .chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  select{font-family:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--rule);background:var(--panel);border-radius:6px;color:var(--ink)}
+
+  /* map + leaderboard */
+  .mapwrap{display:flex;gap:14px;align-items:stretch}
+  #map{flex:1;height:560px;border:1px solid var(--rule);border-radius:4px;background:#eee}
+  .leaflet-container{font-family:-apple-system,sans-serif}
+  #leaderboard{width:322px;height:560px;display:flex;flex-direction:column;
+    border:1px solid var(--rule);border-radius:4px;background:var(--panel);overflow:hidden}
+  .lbhead{display:flex;justify-content:space-between;align-items:center;padding:8px 11px 7px;
+    border-bottom:1px solid var(--ink);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink)}
+  .lbscalerow{display:flex;gap:0;width:104px;justify-content:space-between;font-family:ui-monospace,monospace;
+    letter-spacing:0;color:var(--faint);font-size:9.5px}
+  #lbrows{overflow-y:auto;flex:1}
+  .lbrow{display:grid;grid-template-columns:20px 1fr 104px 26px 16px;align-items:center;gap:7px;
+    padding:4px 10px;border-bottom:1px solid var(--rule2);cursor:pointer;transition:background .1s}
+  .lbrow:hover,.lbrow.hl{background:#f3eede}
+  .lbrow.pick{box-shadow:inset 3px 0 0 var(--pick)}
+  .lbrank{font-size:11px;color:var(--faint);text-align:right}
+  .lbname{font-size:12px;line-height:1.2;overflow:hidden}
+  .lbname .lbsub{display:block;font-size:9.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lbname .love{color:#b5573f}
+  .lbname .lbnew{font-size:8px;font-family:-apple-system,sans-serif;font-weight:700;letter-spacing:.04em;color:var(--good);margin-left:3px;text-transform:uppercase}
+  .lbaxis{position:relative;height:16px}
+  .lbaxis .lbtick{position:absolute;left:50%;top:2px;bottom:2px;width:1px;background:var(--rule)}
+  .lbaxis::before{content:"";position:absolute;left:2%;right:2%;top:50%;height:1px;background:var(--rule)}
+  .lbdot{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 1.5px var(--panel)}
+  .lbfit{font-size:12px;font-weight:600;text-align:right}
+  .legend{background:rgba(255,253,248,.88);padding:5px 8px;border:1px solid rgba(0,0,0,.06);border-radius:4px;
+    font-size:10px;line-height:1.6;color:var(--muted);max-width:250px}
+  .legend .li{margin-right:7px;white-space:nowrap}
+  .legend .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}
+  .legend .ring{box-shadow:0 0 0 2px var(--pick)}
+  /* rank markers (nodes) */
+  .rankmark-wrap{background:none!important;border:none!important}
+  .rankmark{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;
+    font-weight:700;font-family:ui-monospace,monospace;line-height:1;cursor:pointer;transition:transform .1s}
+  .rankmark-wrap.hl{z-index:1500!important}
+  .rankmark-wrap.hl .rankmark{transform:scale(1.32);box-shadow:0 0 0 2.5px var(--ink),0 2px 6px rgba(0,0,0,.45)!important}
+  .anchor-wrap{background:none!important;border:none!important}
+  .anchor{color:#2b2b2b;font-size:13px;line-height:1;text-shadow:0 0 3px #fff,0 0 3px #fff}
+  .anchor-lbl{background:rgba(255,253,248,.9);border:1px solid var(--rule);border-radius:3px;
+    font-size:10.5px;font-weight:600;color:var(--ink);padding:1px 5px;box-shadow:none}
+  .anchor-lbl::before{display:none}
+  /* popup (with gallery) */
+  .popup{width:216px}
+  .popup .pop-ph{position:relative;height:126px;border-radius:3px;overflow:hidden;margin-bottom:7px;background:#ece7db}
+  .popup img.gimg{width:100%;height:100%;object-fit:cover;display:block}
+  .popup .gnav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:24px;height:30px;border:none;
+    border-radius:4px;cursor:pointer;padding:0;background:rgba(20,18,15,.45);color:#fff;font:400 20px/1 sans-serif;
+    display:flex;align-items:center;justify-content:center}
+  .popup .gnav:hover{background:rgba(20,18,15,.75)}
+  .popup .gprev{left:5px}.popup .gnext{right:5px}
+  .popup .gcount{position:absolute;bottom:5px;right:6px;z-index:3;font-family:ui-monospace,monospace;font-size:10px;
+    color:#fff;background:rgba(20,18,15,.5);padding:1px 5px;border-radius:8px}
+  .popup .pp{font-size:15px;font-weight:600}.popup .ph2{color:#555;font-size:12px;line-height:1.4;margin-top:2px}
+  /* narrow screens: without an explicit height, flex:1 (basis 0) collapses #map to 0 in the column layout */
+  @media(max-width:860px){.mapwrap{flex-direction:column}#map{height:340px;flex:none}#leaderboard{width:auto;height:300px}}
+
+  /* card grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:18px;margin-top:6px}
+  .card{border:1px solid var(--rule);border-radius:5px;background:var(--panel);overflow:hidden;
+    display:flex;flex-direction:column;transition:box-shadow .12s,border-color .12s}
+  .card:hover{box-shadow:0 3px 14px rgba(0,0,0,.09);border-color:var(--faint)}
+  .card.pick{border-color:var(--pick);box-shadow:0 0 0 1px var(--pick) inset}
+  .card .ph{position:relative;height:150px;background:#ece7db;overflow:hidden}
+  .card .ph img.gimg{width:100%;height:100%;object-fit:cover;display:block}
+  .card .ph .gnav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;
+    width:25px;height:33px;border:none;border-radius:4px;cursor:pointer;padding:0;
+    background:rgba(20,18,15,.40);color:#fff;font:400 21px/1 -apple-system,sans-serif;
+    display:flex;align-items:center;justify-content:center;opacity:.5;
+    transition:opacity .12s,background .12s}
+  .card .ph:hover .gnav{opacity:1}
+  .card .ph .gnav:hover{background:rgba(20,18,15,.74)}
+  .card .ph .gprev{left:6px}.card .ph .gnext{right:6px}
+  .card .ph .gcount{position:absolute;bottom:7px;right:8px;z-index:3;
+    font-family:ui-monospace,monospace;font-size:10.5px;color:#fff;
+    background:rgba(20,18,15,.5);padding:1px 6px;border-radius:9px}
+  .card .badge{position:absolute;top:8px;left:8px;font-size:11px;letter-spacing:.04em;
+    padding:2px 7px;border-radius:10px;color:#fff;text-transform:uppercase}
+  .b-apt{background:var(--apt)} .b-room{background:var(--room)}
+  .card .star{position:absolute;top:6px;right:8px;color:var(--pick);font-size:17px;
+    text-shadow:0 1px 2px rgba(0,0,0,.4)}
+  .card .body{padding:11px 13px 13px;display:flex;flex-direction:column;gap:7px;flex:1}
+  .row1{display:flex;justify-content:space-between;align-items:baseline}
+  .price{font-size:21px;font-weight:600}.price small{font-size:12px;color:var(--muted);font-weight:400}
+  .fit{display:inline-flex;align-items:baseline;gap:3px}
+  .fit b{font-size:19px}.fit .s{font-size:10px;color:var(--faint);letter-spacing:.05em}
+  .fit .rk{font-size:11px;color:var(--faint);margin-right:4px}
+  .metaline{font-size:12.5px;color:var(--muted);line-height:1.4}
+  .metaline .love{color:#b5573f}
+  .metaline .drv b{color:var(--ink);font-weight:600}
+  .glyph{display:flex;gap:5px;align-items:flex-end;height:34px;margin:1px 0}
+  .gb{width:15px;border-radius:2px 2px 0 0;background:#ccc}
+  .scorekey{display:flex;flex-wrap:wrap;gap:13px;align-items:center;font-size:11px;color:var(--muted);
+    font-family:-apple-system,sans-serif;margin:0 0 14px}
+  .scorekey .sk{display:inline-flex;align-items:center;gap:5px}
+  .scorekey .sk i{width:11px;height:11px;border-radius:2px;display:inline-block}
+  .scorekey .skx{color:var(--faint);font-style:italic}
+  .flags{display:flex;flex-wrap:wrap;gap:4px}
+  .flag{font-size:10.5px;background:#f1ecdf;color:#6a6455;padding:1px 6px;border-radius:8px}
+  .flag.red{background:#f6e3dd;color:#a24a34}
+  .rat{font-size:13.5px;margin:2px 0 0;line-height:1.42}
+  .attrs{font-size:11.5px;color:var(--faint);border-top:1px solid var(--rule2);padding-top:6px;margin-top:auto}
+  .card a.view{font-size:12.5px;font-family:-apple-system,sans-serif}
+
+  /* neighborhoods */
+  .hoodgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .hood{border:1px solid var(--rule);border-radius:5px;background:var(--panel);padding:12px 14px}
+  .hood h3{margin:0;font-size:16px;display:flex;justify-content:space-between;align-items:baseline}
+  .hood h3 .rg{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .hdrive{font-size:12px;color:var(--muted);margin:3px 0 8px}
+  .hbars{display:flex;gap:14px;margin:6px 0 9px}
+  .hbar{flex:1}
+  .hbar .hl{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:2px}
+  .track{height:5px;background:#ece7da;border-radius:3px;overflow:hidden}
+  .track > i{display:block;height:100%}
+
+  /* search links */
+  .links{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+  .lgroup{border:1px solid var(--rule);border-radius:5px;padding:11px 14px;background:var(--panel)}
+  .lgroup h4{margin:0 0 7px;font-size:13px;letter-spacing:.03em}
+  .lgroup ul{margin:0;padding:0;list-style:none;font-size:13.5px;line-height:1.9}
+  .lgroup .ui{font-family:-apple-system,sans-serif;font-size:13px}
+
+  footer{margin:46px 0 60px;border-top:1px solid var(--rule);padding-top:16px;color:var(--muted);font-size:13px;line-height:1.6}
+  footer b{color:var(--ink)}
+  .callout{background:#fbf4e4;border:1px solid #e8d9b0;border-left:3px solid var(--pick);
+    padding:11px 15px;border-radius:4px;font-size:13.5px;color:#5c5238;margin:12px 0}
+  .empty{color:var(--faint);font-size:13px;font-style:italic;padding:8px 0}
+  /* reach-out */
+  .actions{display:flex;align-items:center;gap:9px;margin-top:2px}
+  .reach-btn{font:600 12px -apple-system,sans-serif;cursor:pointer;border:1px solid var(--apt);
+    color:var(--apt);background:#fff;border-radius:4px;padding:4px 10px;transition:.12s}
+  .reach-btn:hover{background:var(--apt);color:#fff}
+  .card.reached{box-shadow:inset 3px 0 0 var(--nature)}
+  .card.reached .reach-btn{border-color:var(--nature);color:var(--nature)}
+  .card.reached .reach-btn:hover{background:var(--nature);color:#fff}
+  .hide-btn{font:12px -apple-system,sans-serif;cursor:pointer;border:none;background:none;
+    color:var(--faint);padding:4px 4px;margin-left:auto;border-radius:4px;transition:.12s}
+  .hide-btn:hover{color:var(--warn);background:#f6ede7}
+  .reached-badge{position:absolute;top:8px;left:8px;z-index:2;background:var(--nature);color:#fff;
+    font:600 11px -apple-system,sans-serif;padding:3px 8px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .rankmark.reached-mk{box-shadow:0 0 0 2.5px var(--nature),0 1px 3px rgba(0,0,0,.4)!important}
+  .lbrow.reached .lbname::after{content:"✓";color:var(--nature);font-weight:700;margin-left:5px}
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(40,36,28,.5);z-index:5000;display:none;
+    align-items:center;justify-content:center;padding:20px}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--paper,#fdfbf5);border:1px solid #d8cfb8;border-radius:8px;max-width:520px;width:100%;
+    box-shadow:0 12px 40px rgba(0,0,0,.25);padding:20px 22px;font-family:-apple-system,sans-serif}
+  .modal h3{margin:0 0 3px;font-size:16px}
+  .modal .msub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  .modal textarea{width:100%;min-height:132px;font:13.5px/1.5 -apple-system,sans-serif;color:var(--ink);
+    border:1px solid #cdc4ad;border-radius:5px;padding:9px 11px;resize:vertical;box-sizing:border-box;background:#fff}
+  .modal .mnote{font-size:12px;color:var(--muted);margin:9px 0 4px}
+  .mactions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .mbtn{font:600 13px -apple-system,sans-serif;cursor:pointer;border-radius:5px;padding:8px 13px;border:1px solid transparent}
+  .mbtn.primary{background:var(--apt);color:#fff}.mbtn.primary:hover{filter:brightness(1.08)}
+  .mbtn.alt{background:#fff;border-color:#cdc4ad;color:var(--ink)}.mbtn.alt:hover{background:#f3eede}
+  .mbtn.ghost{background:none;color:var(--muted);border:none;margin-left:auto}
+  .mbtn.danger{background:none;border:none;color:#a5503f;cursor:pointer;font-size:12.5px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:9px 16px;border-radius:6px;font:13px -apple-system,sans-serif;z-index:6000;opacity:0;
+    transition:.25s;pointer-events:none}
+  .toast.show{opacity:.96}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <h1>NYC rental scout</h1>
+    <p class="sub">Real, currently-listed NYC rentals — scraped, mapped, photographed, and LLM-rated
+      daily. Set what matters to you below and the whole board re-ranks: the map, the ranking, and the
+      top picks all follow your sliders.</p>
+    <div class="statstrip num" id="stats"></div>
+    <div id="emptyNote" style="display:none" class="callout"><b>No listings yet.</b>
+      Run the refresh pipeline to populate this board:
+      <code>python3 refresh/refresh.py --pull</code> → <code>python3 refresh/rate.py</code> →
+      <code>python3 refresh/refresh.py --build</code> (see the README).</div>
+  </header>
+
+  <section id="wpanel" class="ui">
+    <div class="wtop"><span class="wtitle">What matters to you</span>
+      <button id="wreset" title="Restore default weights">reset ↺</button></div>
+    <div id="wbar"></div>
+    <div id="wsliders"></div>
+    <div class="wrow2">
+      <label class="wprice-lab">max price <input type="range" id="wprice">
+        <span id="wpriceval" class="num"></span></label>
+      <label>show top <select id="wtopn">
+        <option value="10">10</option><option value="20" selected>20</option>
+        <option value="35">35</option><option value="all">all</option></select></label>
+    </div>
+  </section>
+
+  <h2>The map &amp; ranking</h2>
+  <p class="h2note">Each node is numbered by <b>rank under your sliders</b> (1 = best fit) and sized by fit; its <b>color is the
+    component that most lifts it above the field</b> (outline = type; key on the map). Only the top&nbsp;N you've chosen
+    appear here — the full ranking stays in the list on the right (hover to find a dot, click to open it).
+    <b>Zoom in</b> and dots become petal score profiles. The ◆ are the commute anchors.
+    <span style="color:var(--faint)">⌘-scroll zooms the map.</span></p>
+  <div class="mapwrap">
+    <div id="map"></div>
+    <aside id="leaderboard">
+      <div class="lbhead"><span>Ranked by fit</span><span class="lbscalerow"><i>0</i><i>5</i><i>10</i></span></div>
+      <div id="lbrows"></div>
+    </aside>
+  </div>
+
+  <h2>Top 3 right now</h2>
+  <p class="h2note" id="picknote"></p>
+  <div class="scorekey" id="scorekey"></div>
+  <div class="grid" id="picks"></div>
+
+  <h2>All scouted listings</h2>
+  <div class="controls ui" id="controls">
+    <div class="cgroup"><span class="lbl">Area</span><span id="fReg"></span></div>
+    <div class="cgroup"><span class="lbl">Type</span><span id="fBkt"></span></div>
+    <div class="cgroup"><span class="lbl">Contacted</span><span id="fRo"></span></div>
+    <div class="cgroup"><span class="lbl">Sort</span>
+      <select id="sortSel">
+        <option value="fit">Best fit</option>
+        <option value="price">Price ↑</option>
+        <option value="drive">Commute ↑</option>
+        <option value="nature">Most nature</option>
+        <option value="aesthetic">Best photos</option>
+      </select></div>
+    <div class="cgroup"><span id="count" class="lbl"></span></div>
+  </div>
+  <div class="grid" id="grid"></div>
+
+  <h2>Neighborhood scorecards</h2>
+  <p class="h2note">Independent read on each area the listings cluster in — commute, nature, quiet, niceness, and social scene.</p>
+  <div class="hoodgrid" id="hoods"><div class="empty">Neighborhood ratings populate once the review agents finish.</div></div>
+
+  <h2>Browse it yourself</h2>
+  <p class="h2note">StreetEasy and Zillow block scrapers, so here are pre-filtered live searches plus room/housemate sources.</p>
+  <div class="links" id="links"></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="data.js"></script>
+<script src="fitmath.js"></script>
+<script>
+const D = window.HOUSES_DATA;
+const ANCH = (D.meta && D.meta.anchors && D.meta.anchors.length) ? D.meta.anchors
+  : [{label:"Midtown Manhattan", short:"Mid", lat:40.7549, lon:-73.9840}];
+const A0 = ANCH[0], A1 = ANCH[1] || null;
+/* reach-out state — localStorage only (no backend in this fork) */
+const REACHED = new Map();            // url -> {url,title,message,channel,updated_at}
+const byId = id => D.listings.find(x=>x.id===id);
+function isReached(x){ return x && REACHED.has(x.url); }
+/* hidden ("not for me") state — localStorage, keyed by url so it survives refreshes */
+const HID_KEY = "housesHidden.v1";
+const HIDDEN = new Set(JSON.parse(localStorage.getItem(HID_KEY)||"[]"));
+const hidSave = ()=>{ try{ localStorage.setItem(HID_KEY, JSON.stringify([...HIDDEN])); }catch(e){} };
+const isHidden = x => x && HIDDEN.has(x.url);
+const IMAGES = {};   // listing id -> [photo urls]
+const IDX = {};      // listing id -> current photo index
+// global ranking (1 = best) under the CURRENT slider weights — filled by recomputeAll()
+const RANK = {};
+let BOARD = new Set();                       // ids visible on map + grid (top-N after price cap)
+const onBoard = x => BOARD.has(x.id);
+const rk = x => RANK[x.id] ?? "–";
+const SC = [["nature","Nat","--nature"],["quiet","Qt","--quiet"],["nice","Nice","--nice"],
+            ["social","Soc","--social"],["value","Val","--value"],["commute","Cmt","--commute"],
+            ["aesthetic","Pics","--aesthetic"],["gym","Gym","--gym"]];
+const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+const money = n => "$"+Number(n||0).toLocaleString();
+const bedsLabel = b => b===0?"Studio":(b==null?"":b+" BR");
+const commuteLine = x => `<b class="num">${A0.short} ${x.min_a}m</b>`+
+  (A1&&x.min_b!=null?` · <b class="num">${A1.short} ${x.min_b}m</b>`:"")+
+  (x.gym_min!=null?` · gym <b class="num">${x.gym_min}m</b> walk`:"");
+
+if(!D.listings.length) document.getElementById("emptyNote").style.display="block";
+
+/* ---- weight sliders ("what matters to you") — state + panel ---- */
+const WKEY = "housesWeights.v1";
+const WCOMP = [
+  ["commute","commute","--commute"], ["nice","nice area","--nice"],
+  ["aesthetic","photos","--aesthetic"], ["nature","nature","--nature"],
+  ["value","value","--value"], ["soft","quiet/social","--quiet"], ["gym","gym","--gym"]];
+/* snapshot the shipped defaults ONCE — D.meta must stay pristine (reset ↺ reads this) */
+const W0 = Object.assign({}, (D.meta.fit_weights && D.meta.fit_weights.renter) ||
+  {nice:.16, nature:.10, soft:.14, value:.16, commute:.26, aesthetic:.12, gym:.06});
+const defaultRawW = () => Object.fromEntries(FitMath.COMP_KEYS.map(k =>
+  [k, Math.round((W0[k] ?? 1/7) * 100)]));
+let WSTATE = { w: defaultRawW(), cap: null, topN: 20 };
+try {
+  const s = JSON.parse(localStorage.getItem(WKEY) || "null");
+  if (s && s.w && FitMath.COMP_KEYS.every(k => typeof s.w[k] === "number"))
+    WSTATE = { w: s.w, cap: s.cap ?? null, topN: s.topN ?? 20 };
+} catch(e) {}
+const wSave = () => { try{ localStorage.setItem(WKEY, JSON.stringify(WSTATE)); }catch(e){} };
+
+let wCb = null, wTimer = null;
+function onWeightsChanged(cb){ wCb = cb; }
+function wFire(){ clearTimeout(wTimer); wTimer = setTimeout(()=>{ wSave(); wCb && wCb(); }, 80); }
+
+const PMIN = Math.floor((D.meta.price_min ?? 500)/50)*50;
+const PMAX = Math.max(PMIN+50, Math.ceil((D.meta.price_max ?? 4000)/50)*50);
+
+function renderWeightPanel(){
+  const nw = FitMath.normWeights(WSTATE.w);
+  document.getElementById("wbar").innerHTML = WCOMP.map(([k,,v]) =>
+    `<i style="width:${(nw[k]*100).toFixed(1)}%;background:${css(v)}"></i>`).join("");
+  document.querySelectorAll("#wsliders .wpct").forEach(el =>
+    el.textContent = Math.round(nw[el.dataset.k]*100) + "%");
+  document.getElementById("wpriceval").textContent = WSTATE.cap == null ? "any" : money(WSTATE.cap);
+}
+
+(function initWeightPanel(){
+  document.getElementById("wsliders").innerHTML = WCOMP.map(([k,label,v]) =>
+    `<label class="wsl"><span>${label}</span>
+      <input type="range" min="0" max="100" value="${WSTATE.w[k]}" data-k="${k}" style="accent-color:${css(v)}">
+      <span class="wpct" data-k="${k}"></span></label>`).join("");
+  document.querySelectorAll("#wsliders input").forEach(inp =>
+    inp.oninput = () => { WSTATE.w[inp.dataset.k] = +inp.value; renderWeightPanel(); wFire(); });
+  const pr = document.getElementById("wprice");
+  pr.min = PMIN; pr.max = PMAX; pr.step = 50; pr.value = WSTATE.cap ?? PMAX;
+  pr.oninput = () => { WSTATE.cap = +pr.value >= PMAX ? null : +pr.value; renderWeightPanel(); wFire(); };
+  const tn = document.getElementById("wtopn");
+  tn.value = String(WSTATE.topN);
+  tn.onchange = () => { WSTATE.topN = tn.value === "all" ? "all" : +tn.value; wFire(); };
+  document.getElementById("wreset").onclick = () => {
+    WSTATE = { w: defaultRawW(), cap: null, topN: 20 };
+    document.querySelectorAll("#wsliders input").forEach(i => i.value = WSTATE.w[i.dataset.k]);
+    pr.value = PMAX; tn.value = "20";
+    renderWeightPanel(); wFire();
+  };
+  renderWeightPanel();
+})();
+const FALLBACK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23ece7db'/><text x='20' y='24' font-size='9' fill='%23999' text-anchor='middle'>no photo</text></svg>";
+
+/* ---- stats strip ---- */
+const m = D.meta;
+document.getElementById("stats").innerHTML = [
+  ["Listings scouted", (m.n_scouted||0).toLocaleString()],
+  ["Shown here", (m.n_shown||0)+" <small>of "+(m.n_shortlist||0)+" shortlisted</small>"],
+  ["Price range", money(m.price_min)+"–"+money(m.price_max)+" <small>med "+money(m.price_med)+"</small>"],
+  ["Commute anchor"+(A1?"s":""), "<small>"+ANCH.map(a=>a.label).join(" + ")+"</small>"],
+].map(([k,v])=>`<div class="stat"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("");
+
+/* ---- score glyph ---- */
+const SCNAME = {nature:"Nature",quiet:"Quiet",nice:"Nice area",social:"Social",value:"Value",commute:"Commute",aesthetic:"Photo quality",gym:"Gym walk"};
+function glyphRow(s){
+  const bars = SC.map(([key,cap,varn])=>{
+    const v = s && s[key]!=null ? s[key] : null;
+    const h = v==null?2:Math.max(2,v*3.2);
+    const c = v==null?"#d8d2c4":css(varn);
+    return `<div class="gb" style="height:${h}px;background:${c}" title="${SCNAME[key]}: ${v==null?'n/a':v+'/10'}"></div>`;
+  }).join("");
+  return `<div class="glyph">${bars}</div>`;
+}
+document.getElementById("scorekey").innerHTML =
+  SC.map(([key,cap,varn])=>`<span class="sk"><i style="background:${css(varn)}"></i>${SCNAME[key]}</span>`).join("")
+  + `<span class="skx">— each card's bars, left→right, scored 0–10</span>`;
+
+/* ---- listing card ---- */
+function card(x){
+  const attrs = [x.available&&"avail: "+x.available, x.parking&&"parking: "+x.parking, x.laundry&&"laundry: "+x.laundry]
+    .filter(Boolean).join("  ·  ");
+  const imgs = (x.imgs&&x.imgs.length)?x.imgs:[x.img||FALLBACK];
+  IMAGES[x.id]=imgs; IDX[x.id]=0; const n=imgs.length;
+  const nav = n>1 ? `
+      <button class="gnav gprev" data-id="${x.id}" data-dir="-1" aria-label="Previous photo" title="Previous photo">‹</button>
+      <button class="gnav gnext" data-id="${x.id}" data-dir="1" aria-label="Next photo" title="Next photo">›</button>
+      <span class="gcount" data-id="${x.id}">1/${n}</span>` : "";
+  return `<article class="card ${x.pick?'pick':''} ${isReached(x)?'reached':''}" data-id="${x.id}">
+    <div class="ph" data-id="${x.id}">
+      <img class="gimg" loading="lazy" src="${imgs[0]}" onerror="this.src='${FALLBACK}'" alt="">
+      <span class="badge ${x.bucket==='apt'?'b-apt':'b-room'}">${x.bucket==='apt'?'Apartment':'Room'}</span>
+      ${isReached(x)?'<span class="reached-badge">✓ Reached out</span>':''}
+      ${x.pick?'<span class="star" title="Top pick">★</span>':''}${nav}
+    </div>
+    <div class="body">
+      <div class="row1">
+        <span class="price num">${money(x.price)}<small>/mo</small></span>
+        <span class="fit num"><span class="rk" title="overall rank">#${rk(x)}</span><b style="color:${fitColor(x.fit)}">${x.fit==null?'–':x.fit}</b><span class="s">FIT</span></span>
+      </div>
+      <div class="metaline">${bedsLabel(x.beds)} · ${x.hood} · ${x.region}${x.loved?' <span class="love" title="you love this area">♥</span>':''}<br>
+        <span class="drv">${commuteLine(x)}</span></div>
+      ${glyphRow(x.scores)}
+      <p class="rat">${x.rationale||""}</p>
+      <div class="attrs">${attrs||"&nbsp;"}</div>
+      <div class="actions">
+        <a class="view" href="${x.url}" target="_blank" rel="noopener">View listing ↗</a>
+        <button class="reach-btn" data-id="${x.id}">${isReached(x)?'Reached out ✓':'Reach out'}</button>
+        <button class="hide-btn" data-id="${x.id}" title="${isHidden(x)?'Show this listing again':'Hide — not for me'}">${isHidden(x)?'↩ Restore':'✕'}</button>
+      </div>
+    </div>
+  </article>`;
+}
+function fitColor(f){ if(f==null)return "var(--muted)"; return f>=8?css("--good"):f>=6?"#7a7038":css("--warn"); }
+
+/* ---- photo gallery navigation ---- */
+function navPhoto(id, dir){
+  const imgs = IMAGES[id]; if(!imgs||imgs.length<2) return;
+  IDX[id] = ((IDX[id]||0) + dir + imgs.length) % imgs.length;
+  document.querySelectorAll(`.ph[data-id="${id}"]`).forEach(ph=>{
+    const im = ph.querySelector("img.gimg"); if(im) im.src = imgs[IDX[id]];
+    const c = ph.querySelector(".gcount"); if(c) c.textContent = (IDX[id]+1)+"/"+imgs.length;
+  });
+  const nx = imgs[(IDX[id]+1)%imgs.length]; if(nx){ const p=new Image(); p.src=nx; } // preload next
+}
+function wireGalleries(root){
+  (root||document).querySelectorAll(".gnav").forEach(btn=>{
+    btn.onclick = e=>{ e.stopPropagation(); e.preventDefault(); navPhoto(btn.dataset.id, +btn.dataset.dir); };
+  });
+}
+
+/* ---- render picks: top 3 under the current sliders ---- */
+function renderPicks(){
+  const top = D.listings.filter(x=>RANK[x.id]>=1 && RANK[x.id]<=3).sort((a,b)=>RANK[a.id]-RANK[b.id]);
+  document.getElementById("picks").innerHTML = top.map(card).join("") || `<div class="empty">Nothing clears the current filters.</div>`;
+  wireGalleries(document.getElementById("picks"));
+  document.getElementById("picknote").innerHTML =
+    `The ${top.length} best fits under your current sliders — move a slider and these swap.
+     The gold ring marks the daily rater's own pick.`;
+}
+
+/* ---- filters + grid ---- */
+const state = {region:"All", bucket:"All", ro:"All", sort:"fit"};
+const REGIONS = ["All","Manhattan","Brooklyn","Queens","Bronx","NJ","Other"];
+const BUCKETS = [["All","All"],["apt","Apartments"],["room","Rooms"]];
+const ROFILTER = [["All","All"],["reached","Reached out ✓"],["hidden","Hidden ✕"]];
+function chips(el, items, cur, on){
+  el.innerHTML = items.map(it=>{const[v,l]=Array.isArray(it)?it:[it,it];
+    return `<span class="chip ${v===cur?'on':''}" data-v="${v}">${l}</span>`}).join("");
+  el.querySelectorAll(".chip").forEach(c=>c.onclick=()=>on(c.dataset.v));
+}
+
+function filtered(){
+  let a = D.listings.filter(x=>
+    (state.region==="All"||x.region===state.region) &&
+    (state.bucket==="All"||x.bucket===state.bucket) &&
+    (state.ro==="hidden" ? isHidden(x)                          // bookkeeping views bypass the top-N board
+      : state.ro==="reached" ? isReached(x) && !isHidden(x)
+      : onBoard(x)));
+  const s = state.sort;
+  a.sort((p,q)=> s==="price"? p.price-q.price : s==="drive"? p.drive_min-q.drive_min
+      : s==="nature"? (q.scores.nature||0)-(p.scores.nature||0)
+      : s==="aesthetic"? (q.scores.aesthetic||0)-(p.scores.aesthetic||0) : (q.fit||0)-(p.fit||0));
+  return a;
+}
+function renderGrid(){
+  chips(document.getElementById("fReg"),REGIONS,state.region,v=>{state.region=v;renderGrid();});
+  chips(document.getElementById("fBkt"),BUCKETS,state.bucket,v=>{state.bucket=v;renderGrid();});
+  chips(document.getElementById("fRo"),ROFILTER,state.ro,v=>{state.ro=v;renderGrid();});
+  const a = filtered();
+  document.getElementById("grid").innerHTML = a.map(card).join("") || `<div class="empty">Nothing matches — raise the price cap, show more, or loosen the filters.</div>`;
+  document.getElementById("count").textContent = a.length+" shown";
+  wireCardHover();
+  wireGalleries(document.getElementById("grid"));
+}
+document.getElementById("sortSel").onchange = e=>{state.sort=e.target.value;renderGrid();};
+
+/* ---- ranking drivers: which component most lifts a listing above the field ---- */
+let LIVE_W = null;   // normalized slider weights, set by recomputeAll()
+function compScores(x){
+  const s = x.scores||{};
+  return {commute:s.commute??5, nice:s.nice??5, aesthetic:s.aesthetic??5,
+          nature:s.nature??5, value:s.value??5, gym:s.gym??5,
+          soft: x.bucket==="apt" ? (s.quiet??5) : (s.social??5)};
+}
+const DRIVER_KEYS = ["commute","nice","aesthetic","nature","value","gym","soft"];
+const DRIVER_MEANS = {};
+function driverInfo(k, x){
+  return k==="soft"
+    ? (x.bucket==="apt" ? ["Quiet", css("--quiet")] : ["Social", css("--social")])
+    : {commute:["Commute",css("--commute")], nice:["Nice area",css("--nice")],
+       aesthetic:["Photos",css("--aesthetic")], nature:["Nature",css("--nature")],
+       value:["Value",css("--value")], gym:["Gym",css("--gym")]}[k];
+}
+function driver(x){
+  const w = LIVE_W || W0;
+  const sc = compScores(x), m = DRIVER_MEANS.renter || {};
+  let bk = null, bv = -1e9;
+  DRIVER_KEYS.forEach(k=>{ const wi = w[k]??0; if(!wi) return;
+    const d = wi*(sc[k]-(m[k]??5)); if(d>bv){bv=d; bk=k;} });
+  if(bv <= 0.02) return {label:"nothing above average", color:"#a39c8d"};
+  const [label, color] = driverInfo(bk, x);
+  return {label, color};
+}
+
+/* ---- live re-ranking: single source of truth for fit / rank / board ---- */
+function recomputeAll(){
+  const nw = FitMath.normWeights(WSTATE.w);
+  D.listings.forEach(x => { x.fit = FitMath.fitOf(x, nw); });   // hidden too — honest everywhere
+  const cands = D.listings.filter(x => !isHidden(x));
+  const { ranked, boardIds } = FitMath.rankBoard(cands, nw, WSTATE.cap, WSTATE.topN);
+  Object.keys(RANK).forEach(k => delete RANK[k]);
+  ranked.forEach((x,i) => RANK[x.id] = i+1);
+  BOARD = boardIds;
+  LIVE_W = nw;                                                  // map driver hues follow the sliders
+  const rs = cands.map(compScores), mm = {};
+  DRIVER_KEYS.forEach(k => mm[k] = rs.reduce((t,r)=>t+r[k],0)/Math.max(1,rs.length));
+  DRIVER_MEANS.renter = mm;
+}
+
+/* ---- neighborhoods ---- */
+function track(v,varn){const w=Math.max(3,(v||0)*10);return `<div class="track"><i style="width:${w}%;background:${css(varn)}"></i></div>`;}
+function renderHoods(){
+  const el=document.getElementById("hoods");
+  const H=D.neighborhoods||[];
+  if(!H.length) return;
+  const score = h=>0.3*h.scores.nice+0.28*h.scores.nature+0.22*h.scores.quiet+0.2*h.scores.social;
+  H.sort((a,b)=>score(b)-score(a));
+  el.innerHTML = H.map(h=>`<div class="hood">
+    <h3><span>${h.name}</span><span class="rg">${h.region}</span></h3>
+    <div class="hdrive num">🚇 ${A0.short} ~${h.min_a}m <span style="color:var(--faint)">(${h.n} listings, avg fit ${h.avg_fit})</span></div>
+    <div class="hbars">
+      ${["nature","quiet","nice","social"].map(k=>`<div class="hbar"><div class="hl">${k}</div>${track(h.scores[k],"--"+(k==="nice"?"nice":k))}</div>`).join("")}
+    </div>
+  </div>`).join("");
+}
+
+/* ---- search links ---- */
+document.getElementById("links").innerHTML = (D.searchlinks||[]).map(g=>`<div class="lgroup">
+  <h4>${g.group}</h4><ul>${g.links.map(l=>`<li><a class="ui" href="${l.url}" target="_blank" rel="noopener">${l.label} ↗</a></li>`).join("")}</ul></div>`).join("");
+
+/* ---- footer ---- */
+document.getElementById("foot").innerHTML = `
+  <div class="callout"><b>Before you contact anyone:</b> NYC rentals move in days, so open the live link and confirm it's still up.
+  Never wire money or pay a deposit before seeing a unit in person. A price that looks too good usually is.</div>
+  <b>How this was built.</b> This board pulled ${(m.n_scouted||0).toLocaleString()} real, currently-listed rentals from
+  ${(m.source||"Craigslist (live API)").split(", refreshed")[0]} on ${m.generated||"—"}. Review agents
+  opened each posting, looked at every photo, and scored it 1–10 on nature, quiet, niceness, social scene, value, and photo quality.
+  <b>Gym proximity</b> is measured, not guessed: walk time to the nearest OpenStreetMap gym feeds the ranking.
+  <b>Commute</b> is a transit estimate to ${ANCH.map(a=>"<b>"+a.label+"</b>").join(" and ")} — treat it as a prior, not gospel.
+  Component scores are the daily rater's judgment; the weighting is yours via the sliders; some map pins are approximate to the neighborhood.
+  Forked from <a href="https://alex-loftus.com">alex-loftus.com</a>'s Bay Area rental scout.`;
+
+/* ================= MAP ================= */
+const map = L.map("map",{scrollWheelZoom:false}).setView([40.735,-73.96],11);
+/* plain scroll keeps scrolling the page; ⌘-scroll (or ctrl/pinch) zooms the map */
+let lastWheelZoom = 0;
+document.getElementById("map").addEventListener("wheel", e=>{
+  if(!(e.metaKey || e.ctrlKey)) return;
+  e.preventDefault();
+  const now = Date.now();
+  if(now - lastWheelZoom < 140) return;   // trackpads fire fast — gate the rate
+  lastWheelZoom = now;
+  map.setZoomAround(map.mouseEventToLatLng(e), map.getZoom() + (e.deltaY < 0 ? 1 : -1));
+}, {passive:false});
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
+  attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:"abcd", maxZoom:19}).addTo(map);
+
+/* commute anchors from meta */
+function anchor(lat,lon,label){
+  return L.marker([lat,lon],{icon:L.divIcon({className:"anchor-wrap",iconSize:[16,16],iconAnchor:[8,8],
+    html:'<div class="anchor" title="'+label+'">◆</div>'}),zIndexOffset:2000})
+    .bindTooltip(label,{permanent:true,direction:"right",className:"anchor-lbl",offset:[8,0]});
+}
+ANCH.forEach(a=>{ if(a.lat!=null&&a.lon!=null) anchor(a.lat,a.lon,a.label).addTo(map); });
+
+function shortHood(h){ if(!h)return"";
+  let s=h.replace(/\s*\/\s*/g,"/").replace(/\b\w/g,c=>c.toUpperCase());
+  return s.length>26?s.slice(0,25)+"…":s; }
+function popupInner(x){
+  const imgs=IMAGES[x.id]||[x.img||FALLBACK]; const i=IDX[x.id]||0; const n=imgs.length;
+  const nav = n>1?`<button class="gnav gprev" data-id="${x.id}" data-dir="-1" aria-label="Previous photo">‹</button>
+    <button class="gnav gnext" data-id="${x.id}" data-dir="1" aria-label="Next photo">›</button>
+    <span class="gcount" data-id="${x.id}">${i+1}/${n}</span>`:"";
+  return `<div class="popup">
+    <div class="ph pop-ph" data-id="${x.id}"><img class="gimg" src="${imgs[i]}" onerror="this.src='${FALLBACK}'">${nav}</div>
+    <div class="pp num">#${rk(x)} · ${money(x.price)} <span style="font-size:12px;color:#777">${bedsLabel(x.beds)}</span>
+      <b style="float:right;color:${fitColor(x.fit)}">${x.fit==null?'–':x.fit}</b></div>
+    <div class="ph2">${x.loved?'♥ ':''}${x.hood} · ${x.region}<br>${A0.short} ${x.min_a}m${A1&&x.min_b!=null?` · ${A1.short} ${x.min_b}m`:''}${x.gym_min!=null?` · gym ${x.gym_min}m`:''}</div>
+    <div style="font-size:11px;color:#8a8378;margin-top:3px">strongest vs field: <b style="color:${driver(x).color}">${driver(x).label}</b></div>
+    <div style="font-size:12px;margin:5px 0 4px">${x.rationale||""}</div>
+    <div class="actions"><a href="${x.url}" target="_blank" rel="noopener">View listing ↗</a>
+      <button class="reach-btn" data-id="${x.id}">${isReached(x)?'Reached out ✓':'Reach out'}</button>
+      <button class="hide-btn" data-id="${x.id}" title="Hide — not for me">✕</button></div></div>`;
+}
+
+const markerById = {};
+const GLYPH_ZOOM = 13;  // >= this: dots swap to coxcomb score-profile petals
+function typeColor(x){ return x.bucket==="apt"?css("--apt"):css("--room"); }
+function coxIcon(x){
+  // coxcomb: seven fixed wedges from 12 o'clock (commute, nice, photos, nature,
+  // value, gym, quiet/social), radius = raw score; center disc keeps rank + type hue.
+  const R=17, size=R*2, rank = RANK[x.id];
+  const sc = compScores(x);
+  const step=360/DRIVER_KEYS.length;
+  const wedge=(i,s,c)=>{
+    const rr=4+(s/10)*(R-4), a0=(i*step-90)*Math.PI/180, a1=((i+1)*step-90)*Math.PI/180;
+    return `<path d="M${R},${R} L${(R+rr*Math.cos(a0)).toFixed(2)},${(R+rr*Math.sin(a0)).toFixed(2)} A${rr.toFixed(2)},${rr.toFixed(2)} 0 0 1 ${(R+rr*Math.cos(a1)).toFixed(2)},${(R+rr*Math.sin(a1)).toFixed(2)} Z" fill="${c}" stroke="#fffdf8" stroke-width="0.7"/>`;
+  };
+  const ringCol = x.pick ? css("--pick") : (isReached(x) ? css("--nature") : null);
+  const svg = `<svg width="${size}" height="${size}" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">
+    ${DRIVER_KEYS.map((k,i)=>wedge(i, sc[k], k==="soft"?driverInfo("soft",x)[1]:driverInfo(k,x)[1])).join("")}
+    ${ringCol?`<circle cx="${R}" cy="${R}" r="${R-1.2}" fill="none" stroke="${ringCol}" stroke-width="2.2"/>`:""}
+    <circle cx="${R}" cy="${R}" r="6" fill="${typeColor(x)}"/>
+    <text x="${R}" y="${R+2.7}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8" font-weight="700" fill="#fff">${rank}</text></svg>`;
+  return L.divIcon({className:"rankmark-wrap",iconSize:[size,size],iconAnchor:[R,R],html:svg});
+}
+function markerIcon(x){
+  if(map.getZoom() >= GLYPH_ZOOM) return coxIcon(x);
+  const size=Math.round(20+(x.fit||5)*1.6);
+  const ring=x.pick?`box-shadow:0 0 0 2.5px ${css('--pick')},0 1px 3px rgba(0,0,0,.4);`:"box-shadow:0 1px 3px rgba(0,0,0,.4);";
+  const fs=RANK[x.id]>9?10:12;
+  const rc=(isReached(x)?"reached-mk ":"");
+  return L.divIcon({className:"rankmark-wrap",iconSize:[size,size],iconAnchor:[size/2,size/2],
+    html:`<div class="rankmark ${rc}" style="width:${size}px;height:${size}px;background:${driver(x).color};border:2.5px solid ${typeColor(x)};${ring}font-size:${fs}px">${RANK[x.id]}</div>`});
+}
+function drawMarkers(list){
+  list.slice().sort((a,b)=>(a.fit||0)-(b.fit||0)).forEach(x=>{  // best fit drawn last = on top
+    if(x.lat==null||x.lon==null) return;
+    const mk=L.marker([x.lat,x.lon],{icon:markerIcon(x),riseOnHover:true});
+    mk.bindPopup(()=>popupInner(x),{maxWidth:236,minWidth:220,autoPan:false});
+    mk.addTo(map); markerById[x.id]=mk;
+  });
+}
+/* swap every marker's glyph when crossing the coxcomb zoom threshold */
+let glyphZoomed = false;
+map.on("zoomend", ()=>{
+  const now = map.getZoom() >= GLYPH_ZOOM;
+  if(now === glyphZoomed) return;
+  glyphZoomed = now;
+  for(const id in markerById){
+    const x = byId(id);
+    if(x) markerById[id].setIcon(markerIcon(x));
+  }
+});
+map.on("popupopen",e=>{
+  const el=e.popup.getElement(); if(el) wireGalleries(el);
+  const id=(el&&el.querySelector(".pop-ph"))?el.querySelector(".pop-ph").dataset.id:null;
+  if(id){ const row=document.querySelector(`.lbrow[data-id="${id}"]`);
+    if(row){ row.classList.add("hl"); row.scrollIntoView({block:"nearest"}); } }
+});
+map.on("popupclose",()=>document.querySelectorAll(".lbrow.hl").forEach(r=>r.classList.remove("hl")));
+
+function highlightMarker(id,on){
+  const mk=markerById[id]; if(mk){const el=mk.getElement(); if(el)el.classList.toggle("hl",on); mk.setZIndexOffset(on?1500:0);}
+  const row=document.querySelector(`.lbrow[data-id="${id}"]`); if(row)row.classList.toggle("hl",on);
+}
+function flyToListing(id){
+  // no pan, no zoom, no page scroll — just open the popup and highlight the marker
+  const mk=markerById[id]; if(!mk)return;
+  mk.openPopup();
+}
+function wireCardHover(){
+  document.querySelectorAll("#grid .card, #picks .card").forEach(c=>{
+    c.onmouseenter=()=>highlightMarker(c.dataset.id,true);
+    c.onmouseleave=()=>highlightMarker(c.dataset.id,false);
+    c.onclick=e=>{ if(e.target.closest("a,button,.gnav,.gcount"))return; flyToListing(c.dataset.id); };
+  });
+}
+
+/* ---- ranked leaderboard (dot-plot, descending by fit) ---- */
+function renderLeaderboard(){
+  // ranked candidates first (hairline rule at the top-N visibility cutoff), then over-cap rows faded
+  const ranked=[...D.listings].filter(x=>RANK[x.id]).sort((a,b)=>RANK[a.id]-RANK[b.id]);
+  const rest=D.listings.filter(x=>!RANK[x.id] && !isHidden(x));
+  const N = WSTATE.topN==="all" ? Infinity : WSTATE.topN;
+  const rows=[...ranked,...rest];
+  document.getElementById("lbrows").innerHTML = rows.map((x,i)=>{
+    const off = i>=N || !RANK[x.id];
+    const cut = i===N && N<rows.length ? `<div class="lbcut" title="only the top ${N} show on the map"></div>` : "";
+    const left=Math.max(2,Math.min(98,(x.fit||0)*10));
+    const col=x.bucket==="apt"?css("--apt"):css("--room");
+    return `${cut}<div class="lbrow ${x.pick?'pick':''} ${isReached(x)?'reached':''} ${off?'offboard':''}" data-id="${x.id}">
+      <span class="lbrank num">${rk(x)}</span>
+      <span class="lbname">${x.loved?'<span class="love">♥</span> ':''}${shortHood(x.hood)}${x.first_seen===D.meta.generated?'<sup class="lbnew" title="first appeared in today\'s refresh">new</sup>':''}
+        <span class="lbsub num">${money(x.price)} · ${A0.short} ${x.min_a}${A1&&x.min_b!=null?` · ${A1.short} ${x.min_b}`:''}</span></span>
+      <span class="lbaxis"><i class="lbtick"></i><i class="lbdot" style="left:${left}%;background:${col}"></i></span>
+      <span class="lbfit num" style="color:${fitColor(x.fit)}">${x.fit}</span>
+      <button class="hide-btn" data-id="${x.id}" title="Hide — not for me">✕</button>
+    </div>`;
+  }).join("");
+  document.querySelectorAll(".lbrow").forEach(r=>{
+    r.onmouseenter=()=>highlightMarker(r.dataset.id,true);
+    r.onmouseleave=()=>highlightMarker(r.dataset.id,false);
+    r.onclick=e=>{ if(e.target.closest("button"))return; flyToListing(r.dataset.id); };
+  });
+}
+
+/* legend */
+const legend = L.control({position:"bottomright"});
+legend.onAdd=function(){const d=L.DomUtil.create("div","legend");
+  const it=(c,l)=>`<span class="li"><span class="dot" style="background:${c}"></span>${l}</span>`;
+  d.innerHTML=`${[["--commute","Commute"],["--nice","Nice"],["--aesthetic","Photos"],["--nature","Nature"],["--value","Value"],["--gym","Gym"]]
+      .map(([v,l])=>it(css(v),l)).join("")}${it(css('--quiet'),"Quiet")}${it(css('--social'),"Social")}${it("#a39c8d","none")}<br>
+    <span style="color:var(--faint)">fill = strongest trait · outline = type · gold ring = pick</span>`;
+  return d;};
+legend.addTo(map);
+
+/* ============ reach-out (localStorage only) ============ */
+function draftMessage(x){
+  return `Hi! I'm interested in your listing "${x.title||'your place'}" (${money(x.price)}/mo`+
+    `${x.hood?', '+x.hood:''}). Is it still available? I'd love to set up a time to see it. Thanks!`;
+}
+
+function toast(msg){
+  let t=document.getElementById("toast");
+  if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add("show"); clearTimeout(t._h);
+  t._h=setTimeout(()=>t.classList.remove("show"),2200);
+}
+
+function refreshReachedUI(){ recomputeAll(); renderGrid(); renderLeaderboard(); renderPicks();
+  Object.values(markerById).forEach(mk=>map.removeLayer(mk));
+  for(const k in markerById) delete markerById[k];
+  drawMarkers(D.listings.filter(onBoard)); }
+
+const LS_KEY = "housesReached.v1";
+function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify([...REACHED.values()])); }catch(e){} }
+
+function loadReached(){
+  try{ (JSON.parse(localStorage.getItem(LS_KEY)||"[]")).forEach(e=>{ if(e&&e.url) REACHED.set(e.url,e); }); }catch(e){}
+  if(REACHED.size) refreshReachedUI();
+}
+function saveReached(x,channel,message){
+  REACHED.set(x.url,{url:x.url,title:x.title||"",message:message||"",channel:channel||"listing",
+    updated_at:new Date().toISOString()});
+  lsSave(); refreshReachedUI();
+}
+function unmarkReached(x){
+  REACHED.delete(x.url); lsSave(); refreshReachedUI(); closeReach();
+}
+
+/* ---- modal ---- */
+let MODAL_X=null;
+function openReach(id){
+  const x=byId(id); if(!x) return; MODAL_X=x;
+  const already=REACHED.get(x.url);
+  const email=x.contact_email, phone=x.contact_phone;
+  document.getElementById("rm-title").textContent=x.title||x.hood||"Listing";
+  document.getElementById("rm-sub").innerHTML=`${money(x.price)}/mo · ${x.hood||""} · ${x.region||""}`+
+    (already?` &nbsp;·&nbsp; <b style="color:var(--nature)">✓ reached out</b>`:"");
+  const ta=document.getElementById("rm-msg");
+  ta.value=(already&&already.message)?already.message:draftMessage(x);
+  // contact line
+  const cl=document.getElementById("rm-contact");
+  if(email||phone){ cl.innerHTML=`Poster left contact info in the post: `+
+    (email?`<b>${email}</b>`:"")+(email&&phone?" · ":"")+(phone?`<b>${phone}</b>`:"")+
+    `. You can message them directly, or copy + open the listing to use the site's reply.`; }
+  else{ cl.innerHTML=`Craigslist hides the poster's email, so copy your message and open the listing, `+
+    `then paste it into the site's <b>reply</b>. Marking this "reached out" is saved in this browser.`; }
+  // buttons
+  const acts=document.getElementById("rm-actions"); acts.innerHTML="";
+  const mk=(cls,label,fn)=>{const b=document.createElement("button");b.className="mbtn "+cls;b.textContent=label;b.onclick=fn;return b;};
+  if(email){ acts.appendChild(mk("primary","✉ Email poster",()=>{
+    const s=encodeURIComponent(`Inquiry: ${x.title||'your listing'}`), b=encodeURIComponent(ta.value);
+    window.open(`mailto:${email}?subject=${s}&body=${b}`,"_blank");
+    saveReached(x,"email",ta.value); toast("Marked reached out"); closeReach();
+  })); }
+  if(phone){ acts.appendChild(mk(email?"alt":"primary","✆ Text poster",()=>{
+    window.open(`sms:${phone.replace(/[^0-9]/g,"")}?&body=${encodeURIComponent(ta.value)}`,"_blank");
+    saveReached(x,"text",ta.value); toast("Marked reached out"); closeReach();
+  })); }
+  acts.appendChild(mk(email||phone?"alt":"primary","⧉ Copy & open listing",async()=>{
+    try{ await navigator.clipboard.writeText(ta.value); }catch(e){}
+    window.open(x.url,"_blank","noopener");
+    saveReached(x,"listing",ta.value); toast("Copied — paste into the listing's reply"); closeReach();
+  }));
+  const foot=document.getElementById("rm-foot");
+  foot.innerHTML="";
+  if(already){ const u=mk("danger","Un-mark reached out",()=>unmarkReached(x)); foot.appendChild(u); }
+  const cancel=mk("ghost","Close",closeReach); foot.appendChild(cancel);
+  document.getElementById("reachModal").classList.add("open");
+}
+function closeReach(){ document.getElementById("reachModal").classList.remove("open"); MODAL_X=null; }
+
+/* event delegation for all reach buttons (cards + popups) */
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".reach-btn"); if(b){ e.preventDefault(); openReach(b.dataset.id); return; }
+  const hb=e.target.closest(".hide-btn");
+  if(hb){
+    e.preventDefault(); e.stopPropagation();
+    const id=hb.dataset.id;
+    const x = byId(id);
+    if(x){
+      const was = isHidden(x);
+      was ? HIDDEN.delete(x.url) : HIDDEN.add(x.url);
+      hidSave(); refreshReachedUI();
+      toast(was ? "Restored" : "Hidden — find it under the Hidden ✕ filter");
+    }
+    return;
+  }
+  if(e.target.id==="reachModal") closeReach();  // click backdrop
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeReach(); });
+
+recomputeAll();                                     // fit/rank/board under current sliders, before first paint
+drawMarkers(D.listings.filter(onBoard));            // map + grid show the top-N board; full ranking lives in the list
+renderLeaderboard();
+renderGrid();
+renderPicks();
+renderHoods();
+onWeightsChanged(refreshReachedUI);                 // sliders re-rank everything (debounced 80ms)
+loadReached();                                      // overlay reached-out state from localStorage
+</script>
+<div class="modal-bg" id="reachModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="rm-title">Listing</h3>
+    <div class="msub" id="rm-sub"></div>
+    <div class="mnote" id="rm-contact"></div>
+    <textarea id="rm-msg" spellcheck="true"></textarea>
+    <div class="mactions" id="rm-actions"></div>
+    <div class="mactions" id="rm-foot" style="margin-top:8px"></div>
+  </div>
+</div>
+</body>
+</html>
