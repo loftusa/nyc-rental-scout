@@ -67,7 +67,9 @@ runners even when it blocks datacenter IPs elsewhere. Setup:
    (Settings → Secrets → Actions). Without the secret, daily runs degrade to
    a sweep instead of failing.
 2. Enable GitHub Pages (Settings → Pages → deploy from branch, root) and the
-   board is live at `https://<you>.github.io/<repo>/`.
+   board is live at `https://<you>.github.io/<repo>/`. (Caveat: if your
+   GitHub *user* site has a custom domain, project pages inherit it — fork
+   to an account without one, or host the three static files anywhere.)
 
 ## Tuning
 
